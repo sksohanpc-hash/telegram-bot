@@ -18,26 +18,16 @@ if not BOT_TOKEN or not API_TOKEN:
 
 app = ApplicationBuilder().token(BOT_TOKEN).build()
 
-
 async def topup(update: Update, context: ContextTypes.DEFAULT_TYPE):
     try:
-        start_time = time.time()
         text = update.message.text.strip()
-
         parts = text.split()
         if len(parts) < 2:
-            await update.message.reply_text(
-                "Usage:\nUID VOUCHER1 VOUCHER2 ..."
-            )
+            await update.message.reply_text("Usage: UID VOUCHER1 VOUCHER2 ...")
             return
 
         playerid = parts[0]
         vouchers = parts[1:]
-
-        headers = {
-            "Authorization": f"{API_TOKEN}",
-            "Content-Type": "application/json"
-        }
 
         payload = {
             "orderid": str(uuid.uuid4()),
@@ -45,17 +35,16 @@ async def topup(update: Update, context: ContextTypes.DEFAULT_TYPE):
             "code": " ".join(vouchers)
         }
 
-        response = requests.post(
-            f"{BASE_URL}/topup-sync",
-            json=payload,
-            headers=headers
-        )
+        headers = {
+            "Authorization": f"{API_TOKEN}",
+            "Content-Type": "application/json"
+        }
 
+        response = requests.post(f"{BASE_URL}/topup-sync", json=payload, headers=headers)
         data = response.json()
 
         end_time = time.time()
-        time_taken = round(end_time - start_time, 2)
-
+        time_taken = round(end_time - time.time(), 2)
         now = datetime.now()
         date_str = now.strftime("%Y-%m-%d")
         time_str = now.strftime("%H:%M:%S")
@@ -77,7 +66,6 @@ async def topup(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
             message += "🎟 Voucher Details:\n"
             message += "━━━━━━━━━━━━━━━━━━━\n"
-
             for i, item in enumerate(data.get("batch", []), start=1):
                 if item["ok"]:
                     status_text = "SUCCESS"
@@ -93,29 +81,20 @@ async def topup(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 message += f"   ➜ Detail : {item['detail']}\n\n"
 
             await update.message.reply_text(message)
-
         else:
             await update.message.reply_text(f"❌ Top-up Failed\nResponse:\n{data}")
 
     except Exception as e:
         await update.message.reply_text(f"❌ Unexpected Error:\n{e}")
 
-
+# Add handler
 app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, topup))
 
-
-# 🔥 Vercel Webhook Handler
+# Vercel handler
 async def handler(request):
     if request.method == "POST":
         update = Update.de_json(await request.json(), app.bot)
         await app.initialize()
         await app.process_update(update)
-        return {
-            "statusCode": 200,
-            "body": "ok"
-        }
-
-    return {
-        "statusCode": 200,
-        "body": "Bot is running"
-    }
+        return {"statusCode": 200, "body": "ok"}
+    return {"statusCode": 200, "body": "Bot is running"}
